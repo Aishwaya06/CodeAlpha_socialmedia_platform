@@ -21,6 +21,7 @@ frontend/
   static/js/api.js         Shared same-origin API, session, and CSRF client
   static/js/app.js         Vanilla JavaScript routes and UI interactions
   static/images/           Bundled default avatar
+index.html                 Root entry point for static hosts such as GitHub Pages
 manage.py                  Django management entry point
 requirements.txt           Pinned Python runtime dependencies
 db.sqlite3                 Local SQLite database (ignored by Git)
@@ -144,5 +145,6 @@ python manage.py test
 
 - Browser-driven UI workflows, browser console output, and visual checks at specific viewport sizes have not been verified in this environment. Backend API tests and local HTTP/static checks have been run; see the current submission report for their results.
 - SQLite is configured for local demonstration. No production database, deployment service, container setup, CI workflow, or production static/media hosting is configured.
+- GitHub Pages can serve the root frontend shell and its static assets, but it cannot run this Django application's `/api/` endpoints. The social features require Django to be deployed to a server and the frontend configured to reach that backend.
 - No deployment has occurred or been verified. Production hosting would need an explicit secret, host/domain, HTTPS, durable database, static/media serving, and deployment-specific configuration.
 - The local database (`db.sqlite3`) and uploaded files (`media/`) are intentionally excluded by `.gitignore`; they are local state and are not included in a source submission unless deliberately handled separately.

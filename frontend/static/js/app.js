@@ -1,6 +1,6 @@
 import { api, ApiError } from "./api.js";
 
-const AVATAR_FALLBACK = "/static/images/default-avatar.svg";
+const AVATAR_FALLBACK = new URL("../images/default-avatar.svg", import.meta.url).href;
 const state = {
   user: null,
   route: { name: "feed" },
