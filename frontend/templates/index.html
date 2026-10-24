@@ -1,25 +1,65 @@
-{% load static %}
-<!doctype html>
+```html
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f6f7fb">
   <meta name="description" content="Connectly brings your community closer.">
-  <title>Connectly — your community, closer</title>
-  <link rel="icon" href="{% static 'images/default-avatar.svg' %}" type="image/svg+xml">
-  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=20261024-profile-layout2">
+
+  <title>Connectly — Your Community, Closer</title>
+
+  <link
+    rel="icon"
+    href="./frontend/static/images/default-avatar.svg"
+    type="image/svg+xml"
+  >
+
+  <link
+    rel="stylesheet"
+    href="./frontend/static/css/app.css?v=20261024-profile-layout2"
+  >
 </head>
+
 <body>
   <a class="skip-link" href="#page">Skip to content</a>
+
   <header class="topbar" id="topbar"></header>
+
   <div class="app-shell" id="app-shell">
-    <aside class="left-rail" id="left-rail" aria-label="Main navigation"></aside>
-    <main id="page" class="page" tabindex="-1" aria-live="polite"></main>
-    <aside class="right-rail" id="right-rail" aria-label="Connectly information"></aside>
+    <aside
+      class="left-rail"
+      id="left-rail"
+      aria-label="Main navigation"
+    ></aside>
+
+    <main
+      id="page"
+      class="page"
+      tabindex="-1"
+      aria-live="polite"
+    ></main>
+
+    <aside
+      class="right-rail"
+      id="right-rail"
+      aria-label="Connectly information"
+    ></aside>
   </div>
-  <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+  <div
+    class="toast-region"
+    id="toast-region"
+    aria-live="polite"
+    aria-atomic="true"
+  ></div>
+
   <div id="modal-root"></div>
-  <script type="module" src="{% static 'js/app.js' %}?v=20261024-profile-layout2"></script>
+
+  <script
+    type="module"
+    src="./frontend/static/js/app.js?v=20261024-profile-layout2"
+  ></script>
 </body>
 </html>
+```
