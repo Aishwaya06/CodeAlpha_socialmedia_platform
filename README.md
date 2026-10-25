@@ -1,12 +1,12 @@
 # Connectly
 
-Connectly is a small, same-origin social platform built with Django REST Framework and a responsive HTML/CSS/vanilla JavaScript frontend. Django serves the application and JSON API; SQLite stores application data.
+Connectly is a small social platform with a Django REST Framework backend and a responsive HTML/CSS/vanilla JavaScript frontend. The root entry point also supports a browser-only demonstration on static hosts such as GitHub Pages.
 
 ## Project status
 
-The local application and its backend APIs are implemented. Automated Django tests cover authentication, profiles, posts, comments, likes, follows, and user discovery. Browser-based interaction and viewport checks have not been completed in this environment. No deployment has been performed or verified. This project is configured for local development and demonstration.
+The Django application and APIs are implemented for local use. The root `index.html` runs a separate frontend-only demo backed by versioned browser storage; it does not call Django. The static demo is not real authentication and its data is not shared between browsers.
 
-Latest verification: `python manage.py check` passed, migration checks reported no pending model changes, and `python manage.py test` passed all 39 tests. Browser-driven UI flows remain unverified.
+Latest verification: `python manage.py check` passed, migration checks reported no pending model changes, and `python manage.py test` passed all 39 tests. Static frontend interactions were checked in a local browser; the deployed GitHub Pages site has not been independently verified.
 
 ## Project structure
 
@@ -18,7 +18,8 @@ social/                    Models, serializers, API views, permissions, migratio
 frontend/
   templates/index.html     Single-page application shell
   static/css/app.css       Responsive application styles
-  static/js/api.js         Shared same-origin API, session, and CSRF client
+  static/js/api.js         Compatibility re-export for the local demonstration data service
+  static/js/demo-data.js   Versioned localStorage-backed sample posts, profiles, and interactions
   static/js/app.js         Vanilla JavaScript routes and UI interactions
   static/images/           Bundled default avatar
 index.html                 Root entry point for static hosts such as GitHub Pages
@@ -34,7 +35,7 @@ media/                     Uploaded profile pictures (ignored by Git)
 - Django 5.2.18 and Django REST Framework 3.18.3
 - SQLite
 - Pillow 10.4.0 for profile image handling
-- HTML5, CSS3, and vanilla JavaScript using Fetch API
+- HTML5, CSS3, vanilla JavaScript, and browser localStorage for the static demo
 
 Python dependency versions are pinned in `requirements.txt`. No frontend package manager or third-party JavaScript dependency is required.
 
@@ -49,7 +50,13 @@ Python dependency versions are pinned in `requirements.txt`. No frontend package
 - Paginated user discovery with case-insensitive username search.
 - Responsive layouts, loading/error/empty states, accessible forms, and a bundled default avatar.
 
-The frontend reads and writes application state through the API. It does not use sample accounts, sample posts, or `localStorage` for persistence.
+The Django-backed application uses the API for server state. The root static-host demo instead uses sample accounts and browser `localStorage`; it does not call the Django API.
+
+## GitHub Pages demonstration
+
+The root `index.html` and `frontend/static/js/app.js` load the existing Connectly interface without Django template rendering. Its demonstration content, likes, comments, follows, profile edits, and demo-mode choice are stored under the versioned `connectly.demo.v1` browser storage key. Use **Reset** in the header to restore the original sample data. If browser storage is blocked or full, the demo remains usable in memory for that tab and displays a warning.
+
+The demo starts as **@maya**, a clearly identified demonstration account. **Exit demo** returns to read-only browsing; the sign-in and registration routes explain that no Django backend is deployed. Demo state is not secure authentication, is not shared with other visitors, and must not be used for passwords or sensitive information. Post image attachments are not provided by the current composer; profile pictures can be stored locally when the selected image is under 300 KB.
 
 ## Database design
 
@@ -139,12 +146,12 @@ python manage.py test
 - **Port 8000 is busy:** use `python manage.py runserver 127.0.0.1:8001` and open `http://127.0.0.1:8001/`.
 - **Host validation error:** use `localhost` or `127.0.0.1` for local access, or configure `DJANGO_ALLOWED_HOSTS` with the hostnames actually used.
 - **CSRF failure:** use the same host and port for the page and API, refresh the page to obtain a current CSRF token, and avoid disabling CSRF checks.
-- **Profile image upload fails:** ensure the image is valid and no larger than 5 MB. Local uploaded media is served by Django only in debug mode.
+- **Profile image upload fails:** ensure the image is valid and no larger than 5 MB for Django, or 300 KB for the browser-only demo. Local uploaded media is served by Django only in debug mode.
 
 ## Known limitations and deployment status
 
-- Browser-driven UI workflows, browser console output, and visual checks at specific viewport sizes have not been verified in this environment. Backend API tests and local HTTP/static checks have been run; see the current submission report for their results.
+- The local browser-only demo was checked for feed, discover/search, profiles, posts, likes, comments, persistence, follow toggling, demo entry/exit, reset, asset loading, console errors, unavailable API requests, and mobile-width overflow. The live GitHub Pages deployment was not independently verified after these changes.
 - SQLite is configured for local demonstration. No production database, deployment service, container setup, CI workflow, or production static/media hosting is configured.
-- GitHub Pages can serve the root frontend shell and its static assets, but it cannot run this Django application's `/api/` endpoints. The social features require Django to be deployed to a server and the frontend configured to reach that backend.
+- GitHub Pages can serve the root frontend shell and its static assets, but cannot run this Django application's API. The root static frontend therefore uses local demonstration data; production multi-user social features and real authentication still require a deployed backend and an integration configuration.
 - No deployment has occurred or been verified. Production hosting would need an explicit secret, host/domain, HTTPS, durable database, static/media serving, and deployment-specific configuration.
 - The local database (`db.sqlite3`) and uploaded files (`media/`) are intentionally excluded by `.gitignore`; they are local state and are not included in a source submission unless deliberately handled separately.

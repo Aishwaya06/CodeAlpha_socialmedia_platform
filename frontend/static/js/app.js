@@ -1,8 +1,9 @@
-import { api, ApiError } from "./api.js";
+import { demoData } from "./demo-data.js";
 
+const CURRENT_DEMO_USERNAME = "maya";
 const AVATAR_FALLBACK = new URL("../images/default-avatar.svg", import.meta.url).href;
 const state = {
-  user: null,
+  user: demoData.getCurrentUser(),
   route: { name: "feed" },
   routeVersion: 0,
   feed: { items: [], next: null },
@@ -14,6 +15,7 @@ const state = {
   openComments: new Set(),
   editingPostId: null,
   modal: null,
+  storageWarningShown: false,
 };
 
 const page = document.getElementById("page");
@@ -44,9 +46,7 @@ function profileHref(username) {
 }
 
 function currentAvatar() {
-  return state.user && state.profile?.username === state.user.username
-    ? state.profile.profile_picture
-    : AVATAR_FALLBACK;
+  return state.user ? demoData.getProfile(state.user.username)?.profile_picture || AVATAR_FALLBACK : AVATAR_FALLBACK;
 }
 
 function relativeTime(value) {
@@ -106,10 +106,12 @@ function renderChrome() {
       <div class="top-account">
         ${state.user ? `
           <a class="account-link" href="${profileHref(state.user.username)}">${avatar(currentAvatar(), state.user.username, "avatar-small")}<span>@${escapeHtml(state.user.username)}</span></a>
-          <button class="button button-quiet button-small" data-action="logout" type="button">Log out</button>
+          <span class="demo-label">DEMO</span>
+          <button class="button button-quiet button-small" data-action="reset-demo" type="button" aria-label="Reset demo data">Reset</button>
+          <button class="button button-quiet button-small" data-action="exit-demo" type="button">Exit demo</button>
         ` : `
-          <a class="button button-quiet button-small" href="#/login">Log in</a>
-          <a class="button button-primary button-small" href="#/register">Join Connectly</a>
+          <button class="button button-primary button-small" data-action="enter-demo" type="button">Try demo</button>
+          <a class="button button-quiet button-small" href="#/login">About sign-in</a>
         `}
       </div>
     </div>`;
@@ -127,7 +129,8 @@ function renderChrome() {
       <a class="rail-link ${state.route.name === "discover" ? "active" : ""}" href="#/discover" ${state.route.name === "discover" ? 'aria-current="page"' : ""}><span class="rail-icon">⌕</span><span>Discover people</span></a>
       ${state.user ? `<a class="rail-link ${state.route.name === "profile" && state.route.username === state.user.username ? "active" : ""}" href="${profileHref(state.user.username)}" ${state.route.name === "profile" && state.route.username === state.user.username ? 'aria-current="page"' : ""}><span class="rail-icon">◉</span><span>Your profile</span></a>` : `<a class="rail-link" href="#/login"><span class="rail-icon">◉</span><span>Your profile</span></a>`}
     </div>
-    <div class="rail-note"><span class="note-spark">✦</span><strong>Good conversations start with a hello.</strong><span>Find your people and share what’s on your mind.</span></div>`;
+    <div class="rail-note"><span class="note-spark">✦</span><strong>Good conversations start with a hello.</strong><span>Find your people and share what’s on your mind.</span></div>
+    ${state.user ? `<section class="rail-card demo-card"><p class="rail-label">DEMONSTRATION ACCOUNT</p><strong>@${escapeHtml(state.user.username)}</strong><p>Changes are saved only in this browser. Demo mode is not secure authentication.</p></section>` : ""}`;
 
   rightRail.innerHTML = `
     <div class="rail-card right-card">
@@ -200,7 +203,7 @@ function postMarkup(post) {
       ${commentsState && !commentsState.loading && !commentsState.error && commentsState.items.length === 0 ? `<p class="comments-empty">No comments yet. Start the conversation.</p>` : ""}
       ${(commentsState?.items || []).map(commentMarkup).join("")}
       ${commentsState?.next ? `<button class="button button-quiet button-small comments-more" data-action="more-comments" data-post-id="${post.id}" type="button">Load earlier comments</button>` : ""}
-      ${state.user ? `<form class="comment-form" data-form="comment" data-post-id="${post.id}"><label class="sr-only" for="comment-${post.id}">Write a comment</label><input id="comment-${post.id}" name="content" maxlength="2000" placeholder="Write a comment…" required><button class="button button-primary button-small" type="submit">Send</button><p class="form-error" aria-live="polite"></p></form>` : `<p class="comments-signin"><a href="#/login">Sign in</a> to join the conversation.</p>`}
+      ${state.user ? `<form class="comment-form" data-form="comment" data-post-id="${post.id}"><label class="sr-only" for="comment-${post.id}">Write a comment</label><input id="comment-${post.id}" name="content" maxlength="2000" placeholder="Write a comment…" required><button class="button button-primary button-small" type="submit">Send</button><p class="form-error" aria-live="polite"></p></form>` : `<p class="comments-signin"><button class="text-button" data-action="enter-demo" type="button">Enter demo mode</button> to join the conversation.</p>`}
     </section>` : ""}
   </article>`;
 }
@@ -212,31 +215,27 @@ function renderPostList(posts, next, moreAction, emptyTitle, emptyMessage) {
 
 function renderComposer() {
   if (!state.user) {
-    return `<section class="composer-card guest-composer"><div class="composer-greeting"><span class="compose-icon">✦</span><div><strong>Your voice belongs here.</strong><p>Sign in to share something with the community.</p></div></div><div class="guest-actions"><a class="button button-primary" href="#/login">Log in</a><a class="button button-quiet" href="#/register">Create an account</a></div></section>`;
+    return `<section class="composer-card guest-composer"><div class="composer-greeting"><span class="compose-icon">✦</span><div><strong>Your voice belongs here.</strong><p>Enter demo mode to post, react, and join the conversation.</p></div></div><div class="guest-actions"><button class="button button-primary" data-action="enter-demo" type="button">Try demo mode</button><a class="button button-quiet" href="#/login">About sign-in</a></div></section>`;
   }
   return `<form class="composer-card" data-form="create-post"><div class="composer-top">${avatar(currentAvatar(), state.user.username, "avatar-medium")}<label class="sr-only" for="new-post">What’s on your mind?</label><textarea id="new-post" name="content" maxlength="5000" aria-describedby="post-character-count" placeholder="What’s on your mind, @${escapeHtml(state.user.username)}?" required></textarea></div><div class="composer-bottom"><div class="composer-meta"><span class="composer-hint">A little kindness goes a long way.</span><output class="character-count" id="post-character-count" data-character-count aria-label="0 of 5000 characters used">0 / 5,000</output></div><div class="composer-actions"><p class="form-error" aria-live="polite"></p><button class="button button-primary" type="submit" disabled><span aria-hidden="true">＋</span> Share post</button></div></div></form>`;
 }
 
 function renderFeed() {
-  page.innerHTML = `<div class="feed-layout"><section class="main-column"><div class="page-heading"><div><p class="eyebrow">YOUR COMMUNITY</p><h1>Home feed</h1><p class="page-subtitle">The latest from people on Connectly.</p></div><span class="heading-spark" aria-hidden="true">✦</span></div>${renderComposer()}<div class="section-heading"><h2>Latest posts</h2><span class="live-label"><i></i> Live from Connectly</span></div><div id="post-list">${renderPostList(state.feed.items, state.feed.next, "more-feed", "A quiet moment", "There are no posts here yet. Be the first to start a conversation.")}</div></section><aside class="feed-aside"><div class="aside-art"><div class="art-orbit orbit-one"></div><div class="art-orbit orbit-two"></div><div class="art-center">c</div><span class="art-star star-one">✦</span><span class="art-star star-two">✳</span><span class="art-dot"></span></div><p class="aside-kicker">A little closer</p><h2>Community is built one post at a time.</h2><p>Share your perspective and make room for someone else’s.</p><a href="#/discover" class="text-link">Find new voices <span aria-hidden="true">→</span></a></aside></div>`;
+  page.innerHTML = `<div class="feed-layout"><section class="main-column"><div class="page-heading"><div><p class="eyebrow">YOUR COMMUNITY</p><h1>Home feed</h1><p class="page-subtitle">The latest from people on Connectly.</p></div><span class="heading-spark" aria-hidden="true">✦</span></div>${renderComposer()}<div class="section-heading"><h2>Latest posts</h2><span class="live-label"><i></i> Demo feed</span></div><div id="post-list">${renderPostList(state.feed.items, state.feed.next, "more-feed", "A quiet moment", "There are no posts here yet. Be the first to start a conversation.")}</div></section><aside class="feed-aside"><div class="aside-art"><div class="art-orbit orbit-one"></div><div class="art-orbit orbit-two"></div><div class="art-center">c</div><span class="art-star star-one">✦</span><span class="art-star star-two">✳</span><span class="art-dot"></span></div><p class="aside-kicker">A little closer</p><h2>Community is built one post at a time.</h2><p>Share your perspective and make room for someone else’s.</p><a href="#/discover" class="text-link">Find new voices <span aria-hidden="true">→</span></a></aside></div>`;
 }
 
 function renderAuthPage(mode) {
   const registration = mode === "register";
-  page.innerHTML = `<div class="auth-layout"><section class="auth-promo"><a class="brand brand-light" href="#/feed"><span class="brand-mark">c</span><span>connectly</span></a><div class="promo-copy"><span class="promo-spark">✦</span><p class="eyebrow">A SOCIAL SPACE THAT FEELS LIKE YOURS</p><h1>Good things happen when we <em>connect.</em></h1><p>Find your people, share your everyday, and make the internet feel a little more human.</p></div><div class="promo-bottom"><span>Here for the little moments.</span><span class="promo-decoration">✳</span></div></section><section class="auth-panel"><div class="auth-form-wrap"><div class="mobile-auth-brand"><a class="brand" href="#/feed"><span class="brand-mark">c</span><span>connectly</span></a></div><p class="eyebrow">${registration ? "YOUR NEXT CHAPTER" : "WELCOME BACK"}</p><h2>${registration ? "Create your account" : "Good to see you again"}</h2><p class="auth-subtitle">${registration ? "A few details and you’re part of the community." : "Pick up where your conversations left off."}</p><form data-form="${registration ? "register" : "login"}" class="auth-form" novalidate>
-      ${registration ? `<div class="field"><label for="register-username">Username</label><input id="register-username" name="username" autocomplete="username" maxlength="150" required placeholder="Choose a username"></div><div class="field"><label for="register-email">Email address</label><input id="register-email" name="email" type="email" autocomplete="email" required placeholder="you@example.com"></div>` : `<div class="field"><label for="login-username">Username</label><input id="login-username" name="username" autocomplete="username" required placeholder="Your username"></div>`}
-      <div class="field"><label for="${registration ? "register-password" : "login-password"}">Password</label><input id="${registration ? "register-password" : "login-password"}" name="password" type="password" autocomplete="${registration ? "new-password" : "current-password"}" required placeholder="${registration ? "At least 8 characters" : "Your password"}"></div>
-      ${registration ? `<div class="field"><label for="register-confirm">Confirm password</label><input id="register-confirm" name="password_confirmation" type="password" autocomplete="new-password" required placeholder="Enter your password again"></div><p class="field-help">Use a unique password that isn’t easy to guess.</p>` : ""}
-      <p class="form-error auth-error" aria-live="polite"></p><button class="button button-primary button-wide" type="submit">${registration ? "Create account" : "Log in"}<span aria-hidden="true">→</span></button></form><p class="auth-switch">${registration ? `Already have an account? <a href="#/login">Log in</a>` : `New to Connectly? <a href="#/register">Create an account</a>`}</p><p class="auth-terms">By continuing, you agree to be kind and make room for other voices.</p></div></section></div>`;
+  page.innerHTML = `<div class="auth-layout"><section class="auth-promo"><a class="brand brand-light" href="#/feed"><span class="brand-mark">c</span><span>connectly</span></a><div class="promo-copy"><span class="promo-spark">✦</span><p class="eyebrow">A SOCIAL SPACE THAT FEELS LIKE YOURS</p><h1>Good things happen when we <em>connect.</em></h1><p>Find your people, share your everyday, and make the internet feel a little more human.</p></div><div class="promo-bottom"><span>Here for the little moments.</span><span class="promo-decoration">✳</span></div></section><section class="auth-panel"><div class="auth-form-wrap"><div class="mobile-auth-brand"><a class="brand" href="#/feed"><span class="brand-mark">c</span><span>connectly</span></a></div><p class="eyebrow">${registration ? "DEMO EXPERIENCE" : "SERVER SIGN-IN UNAVAILABLE"}</p><h2>${registration ? "Try Connectly locally" : "Sign-in needs a backend"}</h2><p class="auth-subtitle">This static GitHub Pages demo has no deployed Django server. No password is needed or saved; demo mode is not secure authentication.</p><section class="demo-auth-notice"><strong>What works here</strong><p>Use the demonstration account <b>@maya</b> to explore profiles, posts, likes, follows, and comments. Changes are saved in this browser only.</p><p>Real accounts and secure sign-in require the Django backend to be deployed.</p></section><button class="button button-primary button-wide" data-action="enter-demo" type="button">Enter demo as @maya <span aria-hidden="true">→</span></button><p class="auth-switch"><a href="#/feed">Return to the home feed</a></p><p class="auth-terms">Demo mode is for exploration only and does not provide identity verification or account security.</p></div></section></div>`;
 }
 
 function profileCard(profile, includeFollow = true) {
   const following = profile.is_following;
-  return `<article class="person-card"><button class="person-main" type="button" data-action="open-profile" data-username="${escapeHtml(profile.username)}">${avatar(profile.profile_picture, profile.username, "avatar-large")}<span class="person-copy"><strong>${escapeHtml(profile.full_name || `@${profile.username}`)}</strong><span>@${escapeHtml(profile.username)}</span>${profile.bio ? `<small>${safeText(profile.bio)}</small>` : ""}</span></button><div class="person-stats"><span><strong>${profile.post_count}</strong> posts</span><span><strong>${profile.follower_count}</strong> followers</span></div>${includeFollow ? (state.user ? `<button class="button ${following ? "button-secondary is-following" : "button-primary"} follow-button" data-action="toggle-follow" data-username="${escapeHtml(profile.username)}" type="button">${following ? "Following" : "Follow"}</button>` : `<a class="button button-secondary follow-button" href="#/login">Follow</a>`) : ""}</article>`;
+  return `<article class="person-card"><button class="person-main" type="button" data-action="open-profile" data-username="${escapeHtml(profile.username)}">${avatar(profile.profile_picture, profile.username, "avatar-large")}<span class="person-copy"><strong>${escapeHtml(profile.full_name || `@${profile.username}`)}</strong><span>@${escapeHtml(profile.username)}</span>${profile.bio ? `<small>${safeText(profile.bio)}</small>` : ""}</span></button><div class="person-stats"><span><strong>${profile.post_count}</strong> posts</span><span><strong>${profile.follower_count}</strong> followers</span></div>${includeFollow ? (state.user ? `<button class="button ${following ? "button-secondary is-following" : "button-primary"} follow-button" data-action="toggle-follow" data-username="${escapeHtml(profile.username)}" type="button">${following ? "Following" : "Follow"}</button>` : `<button class="button button-secondary follow-button" data-action="enter-demo" type="button">Follow</button>`) : ""}</article>`;
 }
 
 function renderDiscovery() {
-  page.innerHTML = `<div class="narrow-column"><div class="page-heading discovery-heading"><div><p class="eyebrow">FIND YOUR PEOPLE</p><h1>Discover</h1><p class="page-subtitle">Good conversations can start anywhere.</p></div><span class="heading-spark" aria-hidden="true">✦</span></div><form class="search-form" data-form="discovery-search"><label class="sr-only" for="people-search">Search usernames</label><span aria-hidden="true">⌕</span><input id="people-search" name="search" value="${escapeHtml(state.discovery.search)}" placeholder="Search by username"><button class="button button-primary" type="submit">Search</button></form><div class="section-heading"><h2>${state.discovery.search ? `Results for “${escapeHtml(state.discovery.search)}”` : "People to know"}</h2><span class="result-note">${state.discovery.items.length ? "Real people, real profiles" : ""}</span></div><div id="people-list">${state.discovery.items.length ? `${state.discovery.items.map((person) => profileCard(person)).join("")}${state.discovery.next ? `<div class="load-more-wrap"><button class="button button-secondary" data-action="more-discovery" type="button">Load more people</button></div>` : ""}` : emptyState("No profiles found", state.discovery.search ? "Try a different username." : "There aren’t any profiles to show yet. Check back soon.")}</div></div>`;
+  page.innerHTML = `<div class="narrow-column"><div class="page-heading discovery-heading"><div><p class="eyebrow">FIND YOUR PEOPLE</p><h1>Discover</h1><p class="page-subtitle">Good conversations can start anywhere.</p></div><span class="heading-spark" aria-hidden="true">✦</span></div><form class="search-form" data-form="discovery-search"><label class="sr-only" for="people-search">Search usernames</label><span aria-hidden="true">⌕</span><input id="people-search" name="search" value="${escapeHtml(state.discovery.search)}" placeholder="Search by username"><button class="button button-primary" type="submit">Search</button></form><div class="section-heading"><h2>${state.discovery.search ? `Results for “${escapeHtml(state.discovery.search)}”` : "People to know"}</h2><span class="result-note">${state.discovery.items.length ? "Sample profiles" : ""}</span></div><div id="people-list">${state.discovery.items.length ? `${state.discovery.items.map((person) => profileCard(person)).join("")}${state.discovery.next ? `<div class="load-more-wrap"><button class="button button-secondary" data-action="more-discovery" type="button">Load more people</button></div>` : ""}` : emptyState("No profiles found", state.discovery.search ? "Try a different name or username." : "There aren’t any profiles to show yet. Check back soon.")}</div></div>`;
 }
 
 function renderStats(profile) {
@@ -246,8 +245,8 @@ function renderStats(profile) {
 function renderProfile() {
   const profile = state.profile;
   const isOwn = state.user && profile.username === state.user.username;
-  page.innerHTML = `<div class="profile-layout"><section class="main-column"><article class="profile-card ${state.profileAnimationPending ? "profile-enter" : ""}"><div class="profile-cover"><span class="cover-orb cover-orb-one"></span><span class="cover-orb cover-orb-two"></span><span class="cover-spark">✦</span></div><div class="profile-overview">${avatar(profile.profile_picture, profile.username, "profile-avatar")}<div class="profile-primary"><div class="profile-name-row"><div><p class="eyebrow">CONNECTLY MEMBER</p><h1>${escapeHtml(profile.full_name || profile.username)}</h1><p class="profile-handle">@${escapeHtml(profile.username)}</p></div>${isOwn ? `<button class="button button-secondary" type="button" data-action="toggle-profile-edit">${state.editingProfile ? "Cancel edit" : "Edit profile"}</button>` : state.user ? `<button class="button ${profile.is_following ? "button-secondary is-following" : "button-primary"}" type="button" data-action="toggle-follow" data-username="${escapeHtml(profile.username)}">${profile.is_following ? "Following" : "Follow"}</button>` : `<a class="button button-primary" href="#/login">Follow</a>`}</div>${profile.bio ? `<p class="profile-bio">${safeText(profile.bio)}</p>` : `<p class="profile-bio profile-bio-empty">${isOwn ? "Add a little about yourself to make your profile your own." : "This member hasn’t added a bio yet."}</p>`}${profile.location ? `<p class="profile-location"><span aria-hidden="true">⌖</span>${escapeHtml(profile.location)}</p>` : ""}${renderStats(profile)}</div></div>
-      ${isOwn && state.editingProfile ? `<form class="profile-edit-form" data-form="edit-profile"><div class="field"><label for="profile-bio">Bio</label><textarea id="profile-bio" name="bio" maxlength="10000">${escapeHtml(profile.bio)}</textarea></div><div class="field"><label for="profile-location">Location</label><input id="profile-location" name="location" maxlength="120" value="${escapeHtml(profile.location)}"></div><div class="field"><label for="profile-picture">Profile picture</label><input id="profile-picture" name="profile_picture" type="file" accept="image/*"><span class="field-help">Images up to 5 MB.</span></div><p class="form-error" aria-live="polite"></p><div class="form-actions"><button class="button button-primary" type="submit">Save profile</button></div></form>` : ""}</article><div class="section-heading profile-post-heading" id="profile-post-heading"><h2>Posts</h2><span class="result-note">${profile.post_count} shared ${profile.post_count === 1 ? "moment" : "moments"}</span></div><div id="profile-post-list">${renderPostList(state.profilePosts.items, state.profilePosts.next, "more-profile-posts", "Nothing shared yet", isOwn ? "Your posts will show up here. Head to the feed to share your first one." : "This member hasn’t shared a post yet.")}</div></section><aside class="profile-aside"><div class="rail-card profile-aside-card"><p class="rail-label">A LITTLE ABOUT</p><h3>${escapeHtml(profile.full_name || profile.username)}</h3><p>${profile.bio ? safeText(profile.bio) : "Every profile is the start of a new conversation."}</p>${profile.location ? `<span class="location-pill">⌖ ${escapeHtml(profile.location)}</span>` : ""}<a href="#/discover" class="text-link">Explore the community <span aria-hidden="true">→</span></a></div></aside></div>`;
+  page.innerHTML = `<div class="profile-layout"><section class="main-column"><article class="profile-card ${state.profileAnimationPending ? "profile-enter" : ""}"><div class="profile-cover"><span class="cover-orb cover-orb-one"></span><span class="cover-orb cover-orb-two"></span><span class="cover-spark">✦</span></div><div class="profile-overview">${avatar(profile.profile_picture, profile.username, "profile-avatar")}<div class="profile-primary"><div class="profile-name-row"><div><p class="eyebrow">CONNECTLY MEMBER</p><h1>${escapeHtml(profile.full_name || profile.username)}</h1><p class="profile-handle">@${escapeHtml(profile.username)}</p></div>  ${isOwn ? `<button class="button button-secondary" type="button" data-action="toggle-profile-edit">${state.editingProfile ? "Cancel edit" : "Edit profile"}</button>` : state.user ? `<button class="button ${profile.is_following ? "button-secondary is-following" : "button-primary"}" type="button" data-action="toggle-follow" data-username="${escapeHtml(profile.username)}">${profile.is_following ? "Following" : "Follow"}</button>` : `<button class="button button-primary" data-action="enter-demo" type="button">Follow</button>`}</div>${profile.bio ? `<p class="profile-bio">${safeText(profile.bio)}</p>` : `<p class="profile-bio profile-bio-empty">${isOwn ? "Add a little about yourself to make your profile your own." : "This member hasn’t added a bio yet."}</p>`}${profile.location ? `<p class="profile-location"><span aria-hidden="true">⌖</span>${escapeHtml(profile.location)}</p>` : ""}${renderStats(profile)}</div></div>
+      ${isOwn && state.editingProfile ? `<form class="profile-edit-form" data-form="edit-profile"><div class="field"><label for="profile-bio">Bio</label><textarea id="profile-bio" name="bio" maxlength="10000">${escapeHtml(profile.bio)}</textarea></div><div class="field"><label for="profile-location">Location</label><input id="profile-location" name="location" maxlength="120" value="${escapeHtml(profile.location)}"></div><div class="field"><label for="profile-picture">Profile picture</label><input id="profile-picture" name="profile_picture" type="file" accept="image/*"><span class="field-help">Images smaller than 300 KB are stored in this browser.</span></div><p class="form-error" aria-live="polite"></p><div class="form-actions"><button class="button button-primary" type="submit">Save profile</button></div></form>` : ""}</article><div class="section-heading profile-post-heading" id="profile-post-heading"><h2>Posts</h2><span class="result-note">${profile.post_count} shared ${profile.post_count === 1 ? "moment" : "moments"}</span></div><div id="profile-post-list">${renderPostList(state.profilePosts.items, state.profilePosts.next, "more-profile-posts", "Nothing shared yet", isOwn ? "Your posts will show up here. Head to the feed to share your first one." : "This member hasn’t shared a post yet.")}</div></section><aside class="profile-aside"><div class="rail-card profile-aside-card"><p class="rail-label">A LITTLE ABOUT</p><h3>${escapeHtml(profile.full_name || profile.username)}</h3><p>${profile.bio ? safeText(profile.bio) : "Every profile is the start of a new conversation."}</p>${profile.location ? `<span class="location-pill">⌖ ${escapeHtml(profile.location)}</span>` : ""}<a href="#/discover" class="text-link">Explore the community <span aria-hidden="true">→</span></a></div></aside></div>`;
 }
 
 function renderMain() {
@@ -258,58 +257,32 @@ function renderMain() {
   else renderAuthPage(state.route.name);
 }
 
-async function loadFeed(token) {
-  page.innerHTML = `<div class="feed-layout"><section class="main-column"><div class="page-heading"><div><p class="eyebrow">YOUR COMMUNITY</p><h1>Home feed</h1></div></div>${loadingState("Finding the latest posts")}</section></div>`;
-  try {
-    const response = await api.get("/api/posts/");
-    if (token !== state.routeVersion) return;
-    state.feed = { items: response.results || [], next: response.next };
-    renderMain();
-    if (state.route.postId) {
-      window.setTimeout(() => document.querySelector(`[data-post-card="${CSS.escape(state.route.postId)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
-    }
-  } catch (error) {
-    if (token !== state.routeVersion) return;
-    page.innerHTML = errorState(error.message, "reload-route");
+function loadFeed(token) {
+  if (token !== state.routeVersion) return;
+  state.feed = { items: demoData.getPosts(), next: null };
+  renderMain();
+  if (state.route.postId) {
+    window.setTimeout(() => document.querySelector(`[data-post-card="${CSS.escape(state.route.postId)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
   }
 }
 
-function discoveryUrl(search = "") {
-  const params = new URLSearchParams({ page_size: "20" });
-  if (search) params.set("search", search);
-  return `/api/profiles/?${params}`;
+function loadDiscovery(token, search = state.discovery.search) {
+  if (token !== state.routeVersion) return;
+  state.discovery = { items: demoData.getProfiles(search), next: null, search };
+  renderMain();
 }
 
-async function loadDiscovery(token, search = state.discovery.search) {
-  page.innerHTML = `<div class="narrow-column"><div class="page-heading"><div><p class="eyebrow">FIND YOUR PEOPLE</p><h1>Discover</h1></div></div>${loadingState("Finding profiles")}</div>`;
-  try {
-    const response = await api.get(discoveryUrl(search));
-    if (token !== state.routeVersion) return;
-    state.discovery = { items: response.results || [], next: response.next, search };
-    renderMain();
-  } catch (error) {
-    if (token !== state.routeVersion) return;
-    page.innerHTML = errorState(error.message, "reload-route");
+function loadProfile(token, username) {
+  if (token !== state.routeVersion) return;
+  state.profile = demoData.getProfile(username);
+  if (!state.profile) {
+    page.innerHTML = emptyState("Profile not found", "This sample profile is not available.", "Explore people", "#/discover");
+    return;
   }
-}
-
-async function loadProfile(token, username) {
-  page.innerHTML = `<div class="profile-layout"><section class="main-column">${loadingState("Loading profile")}</section></div>`;
-  try {
-    const [profile, posts] = await Promise.all([
-      api.get(`/api/profiles/${encodeURIComponent(username)}/`),
-      api.get(`/api/profiles/${encodeURIComponent(username)}/posts/?page_size=20`),
-    ]);
-    if (token !== state.routeVersion) return;
-    state.profile = profile;
-    state.profilePosts = { items: posts.results || [], next: posts.next };
-    state.profileAnimationPending = true;
-    renderMain();
-    state.profileAnimationPending = false;
-  } catch (error) {
-    if (token !== state.routeVersion) return;
-    page.innerHTML = errorState(error.message, "reload-route");
-  }
+  state.profilePosts = { items: demoData.getProfilePosts(username), next: null };
+  state.profileAnimationPending = true;
+  renderMain();
+  state.profileAnimationPending = false;
 }
 
 async function loadRoute() {
@@ -369,30 +342,13 @@ async function submitForm(form) {
   setFormError(form, "");
   setFormBusy(form, true);
   try {
-    if (formType === "login") {
-      const data = new FormData(form);
-      const response = await api.login({ username: data.get("username"), password: data.get("password") });
-      state.user = response.user;
-      await api.refreshCsrf();
-      showToast(`Welcome back, ${response.user.username}.`);
-      return navigate("feed");
-    }
-    if (formType === "register") {
-      const data = new FormData(form);
-      await api.register({
-        username: data.get("username"),
-        email: data.get("email"),
-        password: data.get("password"),
-        password_confirmation: data.get("password_confirmation"),
-      });
-      showToast("Your account is ready. Log in to join the conversation.");
-      return navigate("login");
-    }
     if (formType === "create-post") {
       const data = new FormData(form);
-      const post = await api.post("/api/posts/", { content: data.get("content") });
+      const post = demoData.createPost(data.get("content"));
       state.feed.items.unshift(post);
-      state.editingPostId = null;
+      if (state.profile?.username === state.user.username) state.profilePosts.items.unshift(post);
+      state.profile = demoData.getProfile(state.user.username);
+      notifyStorageWarning();
       showToast("Your post is live.");
       renderMain();
       return;
@@ -400,8 +356,9 @@ async function submitForm(form) {
     if (formType === "edit-post") {
       const postId = Number(form.dataset.postId);
       const data = new FormData(form);
-      const updated = await api.patch(`/api/posts/${postId}/`, { content: data.get("content") });
+      const updated = demoData.updatePost(postId, data.get("content"));
       updatePostInLists(postId, () => updated);
+      notifyStorageWarning();
       state.editingPostId = null;
       showToast("Post updated.");
       renderMain();
@@ -410,24 +367,44 @@ async function submitForm(form) {
     if (formType === "comment") {
       const postId = Number(form.dataset.postId);
       const data = new FormData(form);
-      const created = await api.post(`/api/posts/${postId}/comments/`, { content: data.get("content") });
+      const created = demoData.addComment(postId, data.get("content"));
       const { comment_count: count, ...comment } = created;
       updatePostInLists(postId, (post) => ({ ...post, comment_count: count }));
       const comments = state.comments.get(postId) || { items: [], next: null };
       comments.items.push(comment);
       state.comments.set(postId, comments);
+      notifyStorageWarning();
       showToast("Comment added.");
       renderMain();
       return;
     }
     if (formType === "edit-profile") {
       const data = new FormData(form);
-      const payload = new FormData();
-      payload.append("bio", data.get("bio") || "");
-      payload.append("location", data.get("location") || "");
       const picture = form.querySelector('[name="profile_picture"]').files[0];
-      if (picture) payload.append("profile_picture", picture);
-      state.profile = await api.patchForm("/api/profiles/me/", payload);
+      let profilePicture;
+      if (picture) {
+        if (!picture.type.startsWith("image/")) throw new Error("Choose a valid image file.");
+        if (picture.size > 300 * 1024) throw new Error("Choose an image smaller than 300 KB to keep demo storage available.");
+        profilePicture = await readImageAsDataUrl(picture);
+      }
+      state.profile = demoData.updateProfile({
+        bio: data.get("bio") || "",
+        location: data.get("location") || "",
+        profile_picture: profilePicture,
+      });
+      state.user = demoData.getCurrentUser();
+      for (const list of [state.feed.items, state.profilePosts.items]) {
+        for (const post of list) {
+          if (post.author.username === state.user.username) {
+            post.author = {
+              ...post.author,
+              full_name: state.user.full_name,
+              profile_picture: state.user.profile_picture,
+            };
+          }
+        }
+      }
+      notifyStorageWarning();
       state.editingProfile = false;
       showToast("Profile updated.");
       renderMain();
@@ -436,8 +413,9 @@ async function submitForm(form) {
     if (formType === "discovery-search") {
       const data = new FormData(form);
       state.discovery.search = String(data.get("search") || "").trim();
-      const token = ++state.routeVersion;
-      await loadDiscovery(token, state.discovery.search);
+      state.discovery.items = demoData.getProfiles(state.discovery.search);
+      state.discovery.next = null;
+      renderMain();
     }
   } catch (error) {
     setFormError(form, error.message);
@@ -447,66 +425,39 @@ async function submitForm(form) {
   }
 }
 
-async function loadMoreFeed() {
-  if (!state.feed.next) return;
-  const button = document.querySelector('[data-action="more-feed"]');
-  if (button) { button.disabled = true; button.textContent = "Loading…"; }
-  try {
-    const response = await api.get(state.feed.next);
-    state.feed.items.push(...(response.results || []));
-    state.feed.next = response.next;
-    renderMain();
-  } catch (error) {
-    showToast(error.message, "error");
-    if (button) { button.disabled = false; button.textContent = "Load more"; }
-  }
+function readImageAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      if (typeof reader.result !== "string") reject(new Error("The selected image could not be read."));
+      else resolve(reader.result);
+    });
+    reader.addEventListener("error", () => reject(new Error("The selected image could not be read.")));
+    reader.readAsDataURL(file);
+  });
 }
 
-async function loadMoreProfilePosts() {
-  if (!state.profilePosts.next) return;
-  const button = document.querySelector('[data-action="more-profile-posts"]');
-  if (button) { button.disabled = true; button.textContent = "Loading…"; }
-  try {
-    const response = await api.get(state.profilePosts.next);
-    state.profilePosts.items.push(...(response.results || []));
-    state.profilePosts.next = response.next;
-    renderMain();
-  } catch (error) {
-    showToast(error.message, "error");
-    if (button) { button.disabled = false; button.textContent = "Load more"; }
-  }
-}
-
-async function loadMoreDiscovery() {
-  if (!state.discovery.next) return;
-  const button = document.querySelector('[data-action="more-discovery"]');
-  if (button) { button.disabled = true; button.textContent = "Loading…"; }
-  try {
-    const response = await api.get(state.discovery.next);
-    state.discovery.items.push(...(response.results || []));
-    state.discovery.next = response.next;
-    renderMain();
-  } catch (error) {
-    showToast(error.message, "error");
-    if (button) { button.disabled = false; button.textContent = "Load more people"; }
+function notifyStorageWarning() {
+  const warning = demoData.getStorageWarning();
+  if (warning && !state.storageWarningShown) {
+    state.storageWarningShown = true;
+    showToast(warning, "error");
   }
 }
 
 async function toggleLike(button) {
   if (!state.user) {
-    showToast("Log in to like posts.", "error");
-    return navigate("login");
+    showToast("Enter demo mode to like posts.", "error");
+    return;
   }
   const postId = Number(button.dataset.postId);
   const post = [...state.feed.items, ...state.profilePosts.items].find((item) => item.id === postId);
   if (!post) return;
   const isLiking = !post.is_liked;
-  button.disabled = true;
   try {
-    const result = post.is_liked
-      ? await api.delete(`/api/posts/${postId}/like/`)
-      : await api.post(`/api/posts/${postId}/like/`);
-    updatePostInLists(postId, (item) => ({ ...item, ...result }));
+    const updated = demoData.toggleLike(postId);
+    updatePostInLists(postId, () => updated);
+    notifyStorageWarning();
     renderMain();
     if (isLiking) {
       const heartButton = document.querySelector(`[data-action="toggle-like"][data-post-id="${postId}"]`);
@@ -514,7 +465,6 @@ async function toggleLike(button) {
       window.setTimeout(() => heartButton?.classList.remove("like-success"), 420);
     }
   } catch (error) {
-    button.disabled = false;
     showToast(error.message, "error");
   }
 }
@@ -527,86 +477,62 @@ async function toggleComments(button) {
     return;
   }
   state.openComments.add(postId);
-  state.comments.set(postId, { items: [], next: null, loading: true });
+  state.comments.set(postId, { items: demoData.getComments(postId), next: null, loading: false });
   renderMain();
-  try {
-    const response = await api.get(`/api/posts/${postId}/comments/`);
-    state.comments.set(postId, { items: response.results || [], next: response.next, loading: false });
-  } catch (error) {
-    state.comments.set(postId, { items: [], next: null, loading: false, error: error.message });
-  }
-  renderMain();
-}
-
-async function loadMoreComments(postId) {
-  const current = state.comments.get(postId);
-  if (!current?.next) return;
-  try {
-    const response = await api.get(current.next);
-    state.comments.set(postId, { items: [...(response.results || []), ...current.items], next: response.next, loading: false });
-    renderMain();
-  } catch (error) {
-    showToast(error.message, "error");
-  }
 }
 
 async function deleteComment(button) {
   const commentId = Number(button.dataset.commentId);
-  button.disabled = true;
   try {
-    const response = await api.delete(`/api/comments/${commentId}/`);
-    for (const [postId, comments] of state.comments) {
-      const found = comments.items.some((comment) => comment.id === commentId);
-      if (!found) continue;
-      comments.items = comments.items.filter((comment) => comment.id !== commentId);
-      state.comments.set(postId, comments);
-      updatePostInLists(postId, (post) => ({ ...post, comment_count: response.comment_count }));
-      break;
-    }
+    const response = demoData.deleteComment(commentId);
+    const comments = state.comments.get(response.postId);
+    if (comments) comments.items = comments.items.filter((comment) => comment.id !== commentId);
+    updatePostInLists(response.postId, (post) => ({ ...post, comment_count: response.comment_count }));
+    notifyStorageWarning();
     showToast("Comment deleted.");
     renderMain();
   } catch (error) {
-    button.disabled = false;
     showToast(error.message, "error");
   }
 }
 
 async function toggleFollow(button) {
   if (!state.user) {
-    showToast("Log in to follow people.", "error");
-    return navigate("login");
+    showToast("Enter demo mode to follow people.", "error");
+    return;
   }
   const username = button.dataset.username;
-  button.disabled = true;
   try {
     const isFollowing = button.classList.contains("is-following") || button.textContent.trim() === "Following";
-    const profile = isFollowing
-      ? await api.delete(`/api/profiles/${encodeURIComponent(username)}/follow/`)
-      : await api.post(`/api/profiles/${encodeURIComponent(username)}/follow/`);
-    if (state.profile?.username === username) state.profile = profile;
-    state.discovery.items = state.discovery.items.map((item) => item.username === username ? profile : item);
+    demoData.toggleFollow(username);
+    state.discovery.items = demoData.getProfiles(state.discovery.search);
+    if (state.profile?.username === username) state.profile = demoData.getProfile(username);
+    if (state.profile?.username === state.user.username) state.profile = demoData.getProfile(state.user.username);
+    notifyStorageWarning();
     showToast(isFollowing ? `You unfollowed @${username}.` : `You’re now following @${username}.`);
     renderMain();
   } catch (error) {
-    button.disabled = false;
     showToast(error.message, "error");
   }
 }
 
-async function logout() {
-  const button = document.querySelector('[data-action="logout"]');
-  if (button) { button.disabled = true; button.textContent = "Logging out…"; }
-  try {
-    await api.logout();
-    state.user = null;
-    state.feed.items = state.feed.items.map((post) => ({ ...post, is_liked: false }));
-    await api.refreshCsrf();
-    showToast("You’ve been logged out.");
-    navigate("feed");
-  } catch (error) {
-    showToast(error.message, "error");
-    if (button) { button.disabled = false; button.textContent = "Log out"; }
-  }
+function enterDemo() {
+  demoData.enterDemo();
+  state.user = demoData.getCurrentUser();
+  notifyStorageWarning();
+  showToast("You’re exploring as @maya. This is a local demo account.");
+  navigate("feed");
+}
+
+function exitDemo() {
+  demoData.exitDemo();
+  state.user = null;
+  state.feed.items = demoData.getPosts();
+  state.discovery.items = demoData.getProfiles(state.discovery.search);
+  notifyStorageWarning();
+  showToast("You left demo mode. The feed remains available to browse.");
+  if (state.route.name === "profile" && state.route.username === CURRENT_DEMO_USERNAME) navigate("login");
+  else loadRoute();
 }
 
 async function showRelations(kind) {
@@ -618,19 +544,9 @@ async function showRelations(kind) {
   }
   const relation = kind === "followers" ? "followers" : "following";
   const title = kind === "followers" ? "Followers" : "Following";
-  state.modal = { profileUsername: profile.username, relation, title, items: [], next: null, error: "" };
-  modalRoot.innerHTML = `<div class="modal-backdrop" data-action="close-modal"><section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-heading"><h2 id="modal-title">${title}</h2><button class="icon-button" data-action="close-modal" type="button" aria-label="Close">×</button></div><div class="modal-content">${loadingState("Loading people")}</div></section></div>`;
-  try {
-    const response = await api.get(`/api/profiles/${encodeURIComponent(profile.username)}/${relation}/`);
-    if (!state.modal) return;
-    state.modal.items = response.results || [];
-    state.modal.next = response.next;
-    renderRelationsModal();
-  } catch (error) {
-    if (!state.modal) return;
-    state.modal.error = error.message;
-    renderRelationsModal();
-  }
+  state.modal = { profileUsername: profile.username, relation, title, items: demoData.getRelations(profile.username, relation), next: null, error: "" };
+  modalRoot.innerHTML = `<div class="modal-backdrop" data-action="close-modal"><section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-heading"><h2 id="modal-title">${title}</h2><button class="icon-button" data-action="close-modal" type="button" aria-label="Close">×</button></div><div class="modal-content"></div></section></div>`;
+  renderRelationsModal();
 }
 
 function renderRelationsModal() {
@@ -646,31 +562,24 @@ function renderRelationsModal() {
     : `<p class="modal-empty">No ${state.modal.relation} yet.</p>`;
 }
 
-async function loadMoreRelations(button) {
-  if (!state.modal?.next) return;
-  button.disabled = true;
-  button.textContent = "Loading…";
-  try {
-    const response = await api.get(state.modal.next);
-    state.modal.items.push(...(response.results || []));
-    state.modal.next = response.next;
-    renderRelationsModal();
-  } catch (error) {
-    button.disabled = false;
-    button.textContent = "Load more";
-    showToast(error.message, "error");
-  }
-}
-
 async function handleAction(button, event) {
   switch (button.dataset.action) {
-    case "logout": return logout();
+    case "enter-demo": return enterDemo();
+    case "exit-demo": return exitDemo();
+    case "reset-demo":
+      if (!window.confirm("Reset posts, likes, comments, follows, and profile edits to the original sample data?")) return;
+      demoData.reset();
+      state.user = demoData.getCurrentUser();
+      state.feed = { items: demoData.getPosts(), next: null };
+      state.discovery = { items: demoData.getProfiles(), next: null, search: "" };
+      state.profile = null;
+      state.profilePosts = { items: [], next: null };
+      state.comments.clear();
+      state.storageWarningShown = false;
+      notifyStorageWarning();
+      showToast("Demo data has been reset.");
+      return loadRoute();
     case "reload-route": return loadRoute();
-    case "more-feed": return loadMoreFeed();
-    case "more-profile-posts": return loadMoreProfilePosts();
-    case "more-discovery": return loadMoreDiscovery();
-    case "more-comments": return loadMoreComments(Number(button.dataset.postId));
-    case "more-relations": return loadMoreRelations(button);
     case "toggle-like": return toggleLike(button);
     case "toggle-comments": return toggleComments(button);
     case "delete-comment": return deleteComment(button);
@@ -685,17 +594,17 @@ async function handleAction(button, event) {
     case "delete-post": {
       const postId = Number(button.dataset.postId);
       if (!window.confirm("Delete this post? This will also remove its comments and likes.")) return;
-      button.disabled = true;
       try {
-        await api.delete(`/api/posts/${postId}/`);
+        demoData.deletePost(postId);
         removePostFromLists(postId);
-        if (state.profile && state.profile.username === state.user?.username) {
-          state.profile.post_count = Math.max(0, state.profile.post_count - 1);
+        for (const id of state.comments.keys()) {
+          if (id === postId) state.comments.delete(id);
         }
+        if (state.profile) state.profile = demoData.getProfile(state.profile.username);
+        notifyStorageWarning();
         showToast("Post deleted.");
         renderMain();
       } catch (error) {
-        button.disabled = false;
         showToast(error.message, "error");
       }
       return;
@@ -726,7 +635,10 @@ document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-action]");
   if (!button) return;
   event.preventDefault();
-  handleAction(button, event);
+  handleAction(button, event).catch((error) => {
+    console.error("Connectly action failed.", error);
+    showToast("Something unexpected happened. Please try again.", "error");
+  });
 });
 
 document.addEventListener("input", (event) => {
@@ -754,18 +666,9 @@ document.addEventListener("keydown", (event) => {
 
 window.addEventListener("hashchange", loadRoute);
 
-async function start() {
-  page.innerHTML = loadingState("Opening Connectly");
-  try {
-    await api.refreshCsrf();
-    const response = await api.currentUser();
-    state.user = response.is_authenticated ? response.user : null;
-  } catch (error) {
-    if (!(error instanceof ApiError) || error.status !== 403) {
-      state.user = null;
-    }
-  }
-  await loadRoute();
+function start() {
+  notifyStorageWarning();
+  loadRoute();
 }
 
 start();

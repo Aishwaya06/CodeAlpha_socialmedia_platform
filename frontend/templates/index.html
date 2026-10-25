@@ -1,4 +1,5 @@
 ```html
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,13 +12,13 @@
 
   <link
     rel="icon"
-    href="./frontend/static/images/default-avatar.svg"
+    href="{% static 'images/default-avatar.svg' %}"
     type="image/svg+xml"
   >
 
   <link
     rel="stylesheet"
-    href="./frontend/static/css/app.css?v=20261024-profile-layout2"
+    href="{% static 'css/app.css' %}?v=static-demo-v1"
   >
 </head>
 
@@ -58,7 +59,7 @@
 
   <script
     type="module"
-    src="./frontend/static/js/app.js?v=20261024-profile-layout2"
+    src="{% static 'js/app.js' %}?v=static-demo-v1"
   ></script>
 </body>
 </html>

@@ -68,6 +68,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .top-link.active::after { position: absolute; right: 14px; bottom: -1px; left: 14px; height: 3px; border-radius: 3px 3px 0 0; background: var(--accent); content: ""; }
 .top-account { display: flex; align-items: center; margin-left: auto; gap: 12px; }
 .account-link { display: inline-flex; align-items: center; gap: 9px; color: #5c6680; font-size: .88rem; font-weight: 600; }
+.demo-label { padding: 4px 7px; border-radius: 7px; color: #5d4dc5; background: #efedff; font-size: .61rem; font-weight: 800; letter-spacing: .08em; }
+.demo-card { display: grid; margin-top: 15px; gap: 8px; color: var(--muted); font-size: .77rem; line-height: 1.5; }
+.demo-card .rail-label { margin-bottom: 0; }
+.demo-card > strong { color: #555e78; font-size: .88rem; }
+.demo-card p:not(.rail-label) { margin: 0; }
+.demo-card .button { justify-self: start; }
 
 .app-shell { display: grid; grid-template-columns: minmax(220px, 250px) minmax(0, 760px) minmax(230px, 270px); justify-content: center; width: min(1560px, calc(100% - 56px)); min-height: calc(100vh - 76px); margin: 0 auto; column-gap: clamp(24px, 2vw, 32px); }
 .left-rail, .right-rail { padding-top: 36px; }
@@ -195,7 +201,8 @@ h1, h2, h3 { font-family: Manrope, "DM Sans", sans-serif; }
 .comment-body p { margin: 4px 0 0; color: #626b80; font-size: .81rem; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .comment-delete { width: 25px; height: 25px; font-size: 1.15rem; }
 .comments-empty, .comments-signin { margin: 14px 0; color: #99a0b1; font-size: .78rem; }
-.comments-signin a { color: var(--accent); font-weight: 700; }
+.comments-signin a, .comments-signin button { color: var(--accent); font-weight: 700; }
+.text-button { padding: 0; border: 0; cursor: pointer; background: transparent; }
 .comment-form { display: flex; flex-wrap: wrap; align-items: center; margin-top: 13px; gap: 8px; }
 .comment-form input { min-width: 0; min-height: 38px; flex: 1; padding: 0 12px; border: 1px solid #e9ebf3; border-radius: 10px; outline: 0; color: var(--ink); background: #fafbfe; font-size: .79rem; }
 .comment-form input:focus { border-color: #bdb5ef; background: white; }
@@ -318,6 +325,9 @@ h1, h2, h3 { font-family: Manrope, "DM Sans", sans-serif; }
 .auth-switch { margin: 21px 0 0; color: #7d8598; text-align: center; font-size: .82rem; }
 .auth-switch a { color: var(--accent); font-weight: 700; }
 .auth-terms { margin: 27px 0 0; color: #a5aaba; text-align: center; font-size: .69rem; line-height: 1.5; }
+.demo-auth-notice { margin: 22px 0; padding: 16px; border: 1px solid #e5e1fb; border-radius: 13px; color: #707891; background: #f8f7ff; font-size: .81rem; line-height: 1.55; }
+.demo-auth-notice strong { color: #4f5872; }
+.demo-auth-notice p { margin: 8px 0 0; }
 .mobile-auth-brand { display: none; }
 
 .toast-region { position: fixed; z-index: 70; right: 22px; bottom: 22px; display: grid; width: min(380px, calc(100% - 32px)); gap: 9px; }
@@ -348,6 +358,7 @@ h1, h2, h3 { font-family: Manrope, "DM Sans", sans-serif; }
   .top-navigation { display: none; }
   .app-shell { display: block; width: min(100% - 30px, 680px); min-height: calc(100vh - 66px); }
   .left-rail { position: static; padding-top: 12px; }
+  .demo-card { display: none; }
   .left-rail .nav-card { display: flex; align-items: center; padding: 6px; gap: 4px; }
   .left-rail .rail-label, .left-rail .rail-note { display: none; }
   .rail-link { flex: 1; justify-content: center; min-height: 40px; padding: 0 8px; font-size: .78rem; gap: 6px; }
@@ -371,6 +382,7 @@ h1, h2, h3 { font-family: Manrope, "DM Sans", sans-serif; }
   .top-link span { font-size: 1.05rem; }
   .top-link.active::after { right: 6px; left: 6px; }
   .top-account { gap: 5px; }
+  .top-account .demo-label { display: none; }
   .top-account .button-small { min-height: 32px; padding: 0 9px; font-size: .7rem; }
   .account-link { gap: 0; }
   .account-link span { display: none; }
